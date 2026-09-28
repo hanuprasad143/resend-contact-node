@@ -147,6 +147,49 @@
 // </html>`;
 // }
 
+// import { readFile } from "node:fs/promises";
+
+// const templateUrl = new URL(
+//   "../emailtemplates/erithAIoTemailTemplate.html",
+//   import.meta.url,
+// );
+
+// const escapeHtml = (value) =>
+//   String(value ?? "").replace(
+//     /[&<>"']/g,
+//     (c) =>
+//       ({
+//         "&": "&amp;",
+//         "<": "&lt;",
+//         ">": "&gt;",
+//         '"': "&quot;",
+//         "'": "&#39;",
+//       })[c],
+//   );
+
+// export async function contactEmailHtml(f) {
+//   const html = await readFile(templateUrl, "utf8");
+
+//   const fields = {
+//     first_name: f.first_name,
+//     last_name: f.last_name,
+//     email: f.email,
+//     phone: f.phone,
+//     subject: f.subject || "(not provided)",
+//     message: f.message || "(not provided)",
+//   };
+
+//   return html.replace(
+//     /\{\{\s*(first_name|last_name|email|phone|subject|message)\s*\}\}/g,
+//     (_, key) => {
+//       const value = escapeHtml(fields[key]);
+
+//       return key === "message" ? value.replace(/\r?\n/g, "<br>") : value;
+//     },
+//   );
+// }
+
+
 import { readFile } from "node:fs/promises";
 
 const templateUrl = new URL(
@@ -167,6 +210,40 @@ const escapeHtml = (value) =>
       })[c],
   );
 
+// Validation function
+export function validate(f) {
+  const errors = {};
+
+  if (!f.first_name || !String(f.first_name).trim()) {
+    errors.first_name = "First name is required.";
+  }
+
+  if (!f.last_name || !String(f.last_name).trim()) {
+    errors.last_name = "Last name is required.";
+  }
+
+  if (!f.email || !String(f.email).trim()) {
+    errors.email = "Email is required.";
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) {
+    errors.email = "Invalid email address.";
+  }
+
+  if (!f.phone || !String(f.phone).trim()) {
+    errors.phone = "Phone number is required.";
+  }
+
+  if (!f.subject || !String(f.subject).trim()) {
+    errors.subject = "Subject is required.";
+  }
+
+  if (!f.message || !String(f.message).trim()) {
+    errors.message = "Message is required.";
+  }
+
+  return errors;
+}
+
+// Email HTML template
 export async function contactEmailHtml(f) {
   const html = await readFile(templateUrl, "utf8");
 
@@ -184,7 +261,9 @@ export async function contactEmailHtml(f) {
     (_, key) => {
       const value = escapeHtml(fields[key]);
 
-      return key === "message" ? value.replace(/\r?\n/g, "<br>") : value;
+      return key === "message"
+        ? value.replace(/\r?\n/g, "<br>")
+        : value;
     },
   );
 }
