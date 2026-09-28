@@ -190,80 +190,176 @@
 // }
 
 
-import { readFile } from "node:fs/promises";
+// import { readFile } from "node:fs/promises";
 
+// const templateUrl = new URL(
+//   "../emailtemplates/erithAIoTemailTemplate.html",
+//   import.meta.url,
+// );
+
+// const escapeHtml = (value) =>
+//   String(value ?? "").replace(
+//     /[&<>"']/g,
+//     (c) =>
+//       ({
+//         "&": "&amp;",
+//         "<": "&lt;",
+//         ">": "&gt;",
+//         '"': "&quot;",
+//         "'": "&#39;",
+//       })[c],
+//   );
+
+// // Validation function
+// export function validate(f) {
+//   const errors = {};
+
+//   if (!f.first_name || !String(f.first_name).trim()) {
+//     errors.first_name = "First name is required.";
+//   }
+
+//   if (!f.last_name || !String(f.last_name).trim()) {
+//     errors.last_name = "Last name is required.";
+//   }
+
+//   if (!f.email || !String(f.email).trim()) {
+//     errors.email = "Email is required.";
+//   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) {
+//     errors.email = "Invalid email address.";
+//   }
+
+//   if (!f.phone || !String(f.phone).trim()) {
+//     errors.phone = "Phone number is required.";
+//   }
+
+//   if (!f.subject || !String(f.subject).trim()) {
+//     errors.subject = "Subject is required.";
+//   }
+
+//   if (!f.message || !String(f.message).trim()) {
+//     errors.message = "Message is required.";
+//   }
+
+//   return errors;
+// }
+
+// // Email HTML template
+// export async function contactEmailHtml(f) {
+//   const html = await readFile(templateUrl, "utf8");
+
+//   const fields = {
+//     first_name: f.first_name,
+//     last_name: f.last_name,
+//     email: f.email,
+//     phone: f.phone,
+//     subject: f.subject || "(not provided)",
+//     message: f.message || "(not provided)",
+//   };
+
+//   return html.replace(
+//     /\{\{\s*(first_name|last_name|email|phone|subject|message)\s*\}\}/g,
+//     (_, key) => {
+//       const value = escapeHtml(fields[key]);
+
+//       return key === "message"
+//         ? value.replace(/\r?\n/g, "<br>")
+//         : value;
+//     },
+//   );
+// }
+
+
+import { readFile } from "node:fs/promises"
+
+// HTML template location
 const templateUrl = new URL(
-  "../emailtemplates/erithAIoTemailTemplate.html",
-  import.meta.url,
-);
+    "../emailtemplates/erithAIoTemailTemplate.html",
+    import.meta.url
+)
 
+// Maximum allowed field lengths
+export const limits = {
+    first_name: 100,
+    last_name: 100,
+    email: 254,
+    phone: 25,
+    subject: 200,
+    message: 5000,
+}
+
+// Validate contact form
+export function validate(input) {
+    const errors = {}
+
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+        return { form: "Invalid form submission." }
+    }
+
+    const fields = {}
+
+    for (const [key, max] of Object.entries(limits)) {
+        const value = input[key]
+
+        if (typeof value !== "string" || !value.trim()) {
+            errors[key] = `${key.replace("_", " ")} is required.`
+            continue
+        }
+
+        fields[key] = value.trim()
+
+        if ([...fields[key]].length > max) {
+            errors[key] = `${key.replace("_", " ")} is too long.`
+        }
+    }
+
+    if (
+        fields.email &&
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email)
+    ) {
+        errors.email = "Invalid email address."
+    }
+
+    if (
+        fields.phone &&
+        !/^[+0-9()\- .]{6,25}$/.test(fields.phone)
+    ) {
+        errors.phone = "Invalid phone number."
+    }
+
+    return errors
+}
+
+// Prevent HTML injection
 const escapeHtml = (value) =>
-  String(value ?? "").replace(
-    /[&<>"']/g,
-    (c) =>
-      ({
+    String(value ?? "").replace(/[&<>"']/g, (char) => ({
         "&": "&amp;",
         "<": "&lt;",
         ">": "&gt;",
         '"': "&quot;",
         "'": "&#39;",
-      })[c],
-  );
+    })[char])
 
-// Validation function
-export function validate(f) {
-  const errors = {};
-
-  if (!f.first_name || !String(f.first_name).trim()) {
-    errors.first_name = "First name is required.";
-  }
-
-  if (!f.last_name || !String(f.last_name).trim()) {
-    errors.last_name = "Last name is required.";
-  }
-
-  if (!f.email || !String(f.email).trim()) {
-    errors.email = "Email is required.";
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) {
-    errors.email = "Invalid email address.";
-  }
-
-  if (!f.phone || !String(f.phone).trim()) {
-    errors.phone = "Phone number is required.";
-  }
-
-  if (!f.subject || !String(f.subject).trim()) {
-    errors.subject = "Subject is required.";
-  }
-
-  if (!f.message || !String(f.message).trim()) {
-    errors.message = "Message is required.";
-  }
-
-  return errors;
-}
-
-// Email HTML template
+// Generate email from external HTML template
 export async function contactEmailHtml(f) {
-  const html = await readFile(templateUrl, "utf8");
+    const html = await readFile(templateUrl, "utf8")
 
-  const fields = {
-    first_name: f.first_name,
-    last_name: f.last_name,
-    email: f.email,
-    phone: f.phone,
-    subject: f.subject || "(not provided)",
-    message: f.message || "(not provided)",
-  };
+    const fields = {
+        first_name: f.first_name,
+        last_name: f.last_name,
+        email: f.email,
+        phone: f.phone,
+        subject: f.subject,
+        message: f.message,
+    }
 
-  return html.replace(
-    /\{\{\s*(first_name|last_name|email|phone|subject|message)\s*\}\}/g,
-    (_, key) => {
-      const value = escapeHtml(fields[key]);
+    return html.replace(
+        /\{\{\s*(first_name|last_name|email|phone|subject|message)\s*\}\}/g,
+        (_, key) => {
+            const value = escapeHtml(fields[key])
 
-      return key === "message"
-        ? value.replace(/\r?\n/g, "<br>")
-        : value;
-    },
-  );
+            return key === "message"
+                ? value.replace(/\r?\n/g, "<br>")
+                : value
+        }
+    )
 }
