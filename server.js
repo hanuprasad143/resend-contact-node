@@ -244,6 +244,289 @@
 
 
 
+// import "dotenv/config";
+
+// import express from "express";
+// import multer from "multer";
+
+// import { validate, contactEmailHtml } from "./src/contact.js";
+
+// const app = express();
+
+// app.disable("x-powered-by");
+
+// // Environment configuration
+// const PORT = Number(process.env.PORT) || 10000;
+
+// const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim();
+
+// const FROM_EMAIL = process.env.FROM_EMAIL?.trim();
+
+// const TO_EMAILS = (process.env.TO_EMAILS || "")
+//     .split(",")
+//     .map((email) => email.trim())
+//     .filter(Boolean);
+
+// const ALLOWED_ORIGIN = (
+//     process.env.ALLOWED_ORIGIN?.trim() ||
+//     "https://erithrobotics.framer.website"
+// ).replace(/\/$/, "");
+
+// // Email configuration diagnostics
+// // Never print your API key.
+// console.log("Email configuration:", {
+//     RESEND_API_KEY: Boolean(RESEND_API_KEY),
+//     FROM_EMAIL: Boolean(FROM_EMAIL),
+//     TO_EMAILS_COUNT: TO_EMAILS.length,
+//     ALLOWED_ORIGIN,
+// });
+
+// // Security headers
+// app.use((req, res, next) => {
+//     res.set("X-Content-Type-Options", "nosniff");
+//     res.set("Cache-Control", "no-store");
+//     next();
+// });
+
+// // CORS configuration
+// app.use((req, res, next) => {
+//     const origin = req.get("Origin");
+
+//     res.vary("Origin");
+
+//     if (origin === ALLOWED_ORIGIN) {
+//         res.set("Access-Control-Allow-Origin", origin);
+//         res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+//         res.set("Access-Control-Allow-Headers", "Content-Type");
+//     }
+
+//     if (req.path === "/contact") {
+//         if (origin && origin !== ALLOWED_ORIGIN) {
+//             return res.status(403).json({
+//                 success: false,
+//                 message: "Origin not allowed.",
+//             });
+//         }
+
+//         if (req.method === "OPTIONS") {
+//             return res
+//                 .status(origin === ALLOWED_ORIGIN ? 204 : 403)
+//                 .end();
+//         }
+//     }
+
+//     next();
+// });
+
+// // Health endpoint
+// app.get("/health", (req, res) => {
+//     res.json({ ok: true });
+// });
+
+// // Static files
+// app.use(express.static("public"));
+
+// // Form parsing
+// const upload = multer({
+//     storage: multer.memoryStorage(),
+//     limits: {
+//         fieldSize: 6000,
+//         fields: 8,
+//         parts: 9,
+//     },
+// });
+
+// function parseForm(req, res, next) {
+//     if (req.is("multipart/form-data")) {
+//         return upload.none()(req, res, next);
+//     }
+
+//     if (req.is("application/x-www-form-urlencoded")) {
+//         return express.urlencoded({
+//             extended: false,
+//             limit: "15kb",
+//         })(req, res, next);
+//     }
+
+//     if (req.is("application/json")) {
+//         return express.json({
+//             limit: "15kb",
+//         })(req, res, next);
+//     }
+
+//     return res.status(415).json({
+//         success: false,
+//         message: "Unsupported form content type.",
+//     });
+// }
+
+// // Contact endpoint
+// app.post("/contact", parseForm, async (req, res) => {
+//     // Honeypot protection
+//     if (req.body?.website) {
+//         return res.json({
+//             success: true,
+//             message: "Message received.",
+//         });
+//     }
+
+//     // Validate submitted fields
+//     const errors = validate(req.body);
+
+//     if (Object.keys(errors).length > 0) {
+//         return res.status(422).json({
+//             success: false,
+//             message: "Please check your form details.",
+//             errors,
+//         });
+//     }
+
+//     // Normalize form fields
+//     const fields = {
+//         first_name: req.body.first_name.trim(),
+//         last_name: req.body.last_name.trim(),
+//         email: req.body.email.trim(),
+//         phone: req.body.phone.trim(),
+//         subject: req.body.subject.trim(),
+//         message: req.body.message.trim(),
+//     };
+
+//     // Check required configuration
+//     if (
+//         !RESEND_API_KEY ||
+//         !FROM_EMAIL ||
+//         TO_EMAILS.length !== 4
+//     ) {
+//         console.error("Missing or incomplete email configuration:", {
+//             RESEND_API_KEY: !RESEND_API_KEY,
+//             FROM_EMAIL: !FROM_EMAIL,
+//             TO_EMAILS_COUNT: TO_EMAILS.length,
+//         });
+
+//         return res.status(500).json({
+//             success: false,
+//             message: "Email configuration is incomplete.",
+//         });
+//     }
+
+//     // Validate sender email format
+//     const validSender =
+//         /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(FROM_EMAIL);
+
+//     if (!validSender) {
+//         console.error(
+//             "Invalid FROM_EMAIL format. Check environment variables."
+//         );
+
+//         return res.status(500).json({
+//             success: false,
+//             message: "Sender email configuration is invalid.",
+//         });
+//     }
+
+//     // Validate recipient email formats
+//     const validRecipients = TO_EMAILS.every((email) =>
+//         /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email)
+//     );
+
+//     if (!validRecipients) {
+//         console.error(
+//             "Invalid recipient email format. Check TO_EMAILS."
+//         );
+
+//         return res.status(500).json({
+//             success: false,
+//             message: "Recipient email configuration is invalid.",
+//         });
+//     }
+
+//     try {
+//         // Load external HTML email template
+//         const html = await contactEmailHtml(fields);
+
+//         // Send email using Resend
+//         const upstream = await fetch(
+//             "https://api.resend.com/emails",
+//             {
+//                 method: "POST",
+//                 headers: {
+//                     Authorization: `Bearer ${RESEND_API_KEY}`,
+//                     "Content-Type": "application/json",
+//                 },
+//                 body: JSON.stringify({
+//                     from: FROM_EMAIL,
+//                     to: TO_EMAILS,
+//                     reply_to: fields.email,
+//                     subject: `Contact form: ${fields.subject}`,
+//                     html,
+//                 }),
+//                 signal: AbortSignal.timeout(15000),
+//             }
+//         );
+
+//         if (!upstream.ok) {
+//             let details = {};
+
+//             try {
+//                 details = await upstream.json();
+//             } catch {
+//                 details = {
+//                     message: "Unknown Resend API error",
+//                 };
+//             }
+
+//             console.error("Resend API error:", {
+//                 status: upstream.status,
+//                 name: details.name,
+//                 message: details.message,
+//             });
+
+//             return res.status(502).json({
+//                 success: false,
+//                 message:
+//                     "Email could not be sent. Please try again later.",
+//             });
+//         }
+
+//         return res.json({
+//             success: true,
+//             message: "Your message has been sent successfully.",
+//         });
+//     } catch (error) {
+//         console.error("Contact request failed:", {
+//             name: error.name,
+//             message: error.message,
+//         });
+
+//         return res.status(502).json({
+//             success: false,
+//             message:
+//                 "Email could not be sent. Please try again later.",
+//         });
+//     }
+// });
+
+// // Error handler
+// app.use((err, req, res, next) => {
+//     console.error("Request error:", err.message);
+
+//     const oversized =
+//         err instanceof multer.MulterError ||
+//         err.type === "entity.too.large";
+
+//     return res.status(oversized ? 413 : 400).json({
+//         success: false,
+//         message: "Invalid or oversized form submission.",
+//     });
+// });
+
+// // Start server
+// app.listen(PORT, "0.0.0.0", () => {
+//     console.log(`Contact API listening on port ${PORT}`);
+// });
+
+
+
 import "dotenv/config";
 
 import express from "express";
@@ -262,15 +545,30 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim();
 
 const FROM_EMAIL = process.env.FROM_EMAIL?.trim();
 
+// Comma-separated list, any number of recipients (at least 1)
 const TO_EMAILS = (process.env.TO_EMAILS || "")
     .split(",")
     .map((email) => email.trim())
     .filter(Boolean);
 
-const ALLOWED_ORIGIN = (
+// One or more allowed origins, comma-separated
+// Example: https://erithrobotics.framer.website,https://www.yourdomain.com
+const ALLOWED_ORIGINS = (
     process.env.ALLOWED_ORIGIN?.trim() ||
     "https://erithrobotics.framer.website"
-).replace(/\/$/, "");
+)
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+
+const isAllowedOrigin = (origin) => ALLOWED_ORIGINS.includes(origin);
+
+// Email format checks
+const EMAIL_REGEX = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+
+// Accepts "email@domain.com" or "Name <email@domain.com>"
+const SENDER_REGEX =
+    /^([^<>@\r\n]+\s)?<?[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+>?$/;
 
 // Email configuration diagnostics
 // Never print your API key.
@@ -278,7 +576,7 @@ console.log("Email configuration:", {
     RESEND_API_KEY: Boolean(RESEND_API_KEY),
     FROM_EMAIL: Boolean(FROM_EMAIL),
     TO_EMAILS_COUNT: TO_EMAILS.length,
-    ALLOWED_ORIGIN,
+    ALLOWED_ORIGINS,
 });
 
 // Security headers
@@ -294,14 +592,16 @@ app.use((req, res, next) => {
 
     res.vary("Origin");
 
-    if (origin === ALLOWED_ORIGIN) {
+    if (origin && isAllowedOrigin(origin)) {
         res.set("Access-Control-Allow-Origin", origin);
         res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
         res.set("Access-Control-Allow-Headers", "Content-Type");
     }
 
     if (req.path === "/contact") {
-        if (origin && origin !== ALLOWED_ORIGIN) {
+        if (origin && !isAllowedOrigin(origin)) {
+            console.warn("Blocked origin:", origin);
+
             return res.status(403).json({
                 success: false,
                 message: "Origin not allowed.",
@@ -309,9 +609,7 @@ app.use((req, res, next) => {
         }
 
         if (req.method === "OPTIONS") {
-            return res
-                .status(origin === ALLOWED_ORIGIN ? 204 : 403)
-                .end();
+            return res.status(origin ? 204 : 403).end();
         }
     }
 
@@ -391,15 +689,11 @@ app.post("/contact", parseForm, async (req, res) => {
         message: req.body.message.trim(),
     };
 
-    // Check required configuration
-    if (
-        !RESEND_API_KEY ||
-        !FROM_EMAIL ||
-        TO_EMAILS.length !== 4
-    ) {
+    // Check required configuration (any number of recipients, minimum 1)
+    if (!RESEND_API_KEY || !FROM_EMAIL || TO_EMAILS.length === 0) {
         console.error("Missing or incomplete email configuration:", {
-            RESEND_API_KEY: !RESEND_API_KEY,
-            FROM_EMAIL: !FROM_EMAIL,
+            RESEND_API_KEY_MISSING: !RESEND_API_KEY,
+            FROM_EMAIL_MISSING: !FROM_EMAIL,
             TO_EMAILS_COUNT: TO_EMAILS.length,
         });
 
@@ -410,10 +704,7 @@ app.post("/contact", parseForm, async (req, res) => {
     }
 
     // Validate sender email format
-    const validSender =
-        /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(FROM_EMAIL);
-
-    if (!validSender) {
+    if (!SENDER_REGEX.test(FROM_EMAIL)) {
         console.error(
             "Invalid FROM_EMAIL format. Check environment variables."
         );
@@ -425,13 +716,14 @@ app.post("/contact", parseForm, async (req, res) => {
     }
 
     // Validate recipient email formats
-    const validRecipients = TO_EMAILS.every((email) =>
-        /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email)
+    const invalidRecipients = TO_EMAILS.filter(
+        (email) => !EMAIL_REGEX.test(email)
     );
 
-    if (!validRecipients) {
+    if (invalidRecipients.length > 0) {
         console.error(
-            "Invalid recipient email format. Check TO_EMAILS."
+            "Invalid recipient email format in TO_EMAILS:",
+            invalidRecipients
         );
 
         return res.status(500).json({
@@ -445,24 +737,21 @@ app.post("/contact", parseForm, async (req, res) => {
         const html = await contactEmailHtml(fields);
 
         // Send email using Resend
-        const upstream = await fetch(
-            "https://api.resend.com/emails",
-            {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${RESEND_API_KEY}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    from: FROM_EMAIL,
-                    to: TO_EMAILS,
-                    reply_to: fields.email,
-                    subject: `Contact form: ${fields.subject}`,
-                    html,
-                }),
-                signal: AbortSignal.timeout(15000),
-            }
-        );
+        const upstream = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${RESEND_API_KEY}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                from: FROM_EMAIL,
+                to: TO_EMAILS,
+                reply_to: fields.email,
+                subject: `Contact form: ${fields.subject}`,
+                html,
+            }),
+            signal: AbortSignal.timeout(15000),
+        });
 
         if (!upstream.ok) {
             let details = {};
@@ -483,8 +772,7 @@ app.post("/contact", parseForm, async (req, res) => {
 
             return res.status(502).json({
                 success: false,
-                message:
-                    "Email could not be sent. Please try again later.",
+                message: "Email could not be sent. Please try again later.",
             });
         }
 
@@ -500,8 +788,7 @@ app.post("/contact", parseForm, async (req, res) => {
 
         return res.status(502).json({
             success: false,
-            message:
-                "Email could not be sent. Please try again later.",
+            message: "Email could not be sent. Please try again later.",
         });
     }
 });
